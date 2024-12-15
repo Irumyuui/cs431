@@ -38,6 +38,7 @@ fn main() -> io::Result<()> {
     let ctrlc_listener_handle = listener.clone();
     ctrlc::set_handler(move || {
         ctrlc_listener_handle.cancel().unwrap();
+        // std::process::exit(0);
     })
     .expect("Error setting Ctrl-C handler");
 

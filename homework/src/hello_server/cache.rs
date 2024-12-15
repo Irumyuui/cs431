@@ -9,13 +9,14 @@ use std::sync::{Arc, Mutex, RwLock};
 pub struct Cache<K, V> {
     // todo! This is an example cache type. Build your own cache type that satisfies the
     // specification for `get_or_insert_with`.
-    inner: Mutex<HashMap<K, V>>,
+    // inner: Mutex<HashMap<K, V>>,
+    inner: RwLock<HashMap<K, Arc<Mutex<Option<V>>>>>,
 }
 
 impl<K, V> Default for Cache<K, V> {
     fn default() -> Self {
         Self {
-            inner: Mutex::new(HashMap::new()),
+            inner: Default::default(),
         }
     }
 }
@@ -36,6 +37,37 @@ impl<K: Eq + Hash + Clone, V: Clone> Cache<K, V> {
     ///
     /// [`Entry`]: https://doc.rust-lang.org/stable/std/collections/hash_map/struct.HashMap.html#method.entry
     pub fn get_or_insert_with<F: FnOnce(K) -> V>(&self, key: K, f: F) -> V {
-        todo!()
+        let inner = self.inner.read().unwrap();
+        if let Some(value) = inner.get(&key) {
+            let value = Arc::clone(value);
+            drop(inner);
+
+            if let Ok(value) = value.lock() {
+                if let Some(value) = value.as_ref() {
+                    return value.clone();
+                }
+            };
+        } else {
+            drop(inner);
+        }
+
+        let mut inner = self.inner.write().unwrap();
+        let entry = inner.entry(key.clone());
+
+        let value_lock = match entry {
+            Entry::Occupied(occupied_entry) => occupied_entry.get().clone(),
+            Entry::Vacant(vacant_entry) => vacant_entry.insert(Arc::new(Mutex::new(None))).clone(),
+        };
+        drop(inner);
+
+        let mut value = value_lock.lock().unwrap();
+        if let Some(value) = value.as_ref() {
+            return value.clone();
+        }
+        let ret = f(key.clone());
+        value.replace(ret.clone());
+        drop(value);
+
+        ret
     }
 }

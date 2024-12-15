@@ -45,9 +45,13 @@ impl Shield {
     /// means that this shield is validated.
     pub fn try_protect<T>(&self, pointer: *mut T, src: &AtomicPtr<T>) -> Result<(), *mut T> {
         self.set(pointer);
-        Self::validate(pointer, src).map_err(|new| {
+        // Self::validate(pointer, src).map_err(|new| {
+        //     self.clear();
+        //     new
+        // })
+
+        Self::validate(pointer, src).inspect_err(|f| {
             self.clear();
-            new
         })
     }
 
